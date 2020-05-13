@@ -97,7 +97,7 @@ def extract_feature(img_path, train_flag, image_features_extract_model):
 
     image_dataset = tf.data.Dataset.from_tensor_slices(unique_img)
     image_dataset = image_dataset.map(
-        load_image, num_parallel_calls=tf.data.experimental.AUTOTUNE).batch(32)
+        load_image, num_parallel_calls=tf.data.experimental.AUTOTUNE).batch(8)
 
     for img, path in tqdm(image_dataset):
         batch_features = image_features_extract_model(img)
@@ -172,16 +172,16 @@ def main(params):
     print('tokenizing done!')
 
     # using vgg19 pool5 to extract image feature
-    # image_model = tf.keras.applications.VGG19(include_top=False,
-    #                                          weights='imagenet')
-    # new_input = image_model.input
-    # hidden_layer = image_model.layers[-1].output
-    # image_features_extract_model = tf.keras.Model(new_input, hidden_layer)
+    image_model = tf.keras.applications.VGG19(include_top=False,
+                                              weights='imagenet')
+    new_input = image_model.input
+    hidden_layer = image_model.layers[-1].output
+    image_features_extract_model = tf.keras.Model(new_input, hidden_layer)
     print("image model ready")
 
     # extract image features
     # Train
-    # extract_feature(all_train_img_path, True, image_features_extract_model)
+    extract_feature(all_train_img_path, True, image_features_extract_model)
     print("train image done.")
 
     # Test
