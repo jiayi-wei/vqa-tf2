@@ -91,6 +91,8 @@ def feature_path(p, cate, train_flag):
 
 
 def extract_feature(img_path, train_flag, image_features_extract_model):
+    # feature is in shape of [7*7, 512]
+
     unique_img = list(set(img_path))
     unique_img = list(map(lambda x: os.path.join('./data/', x), unique_img))
     print("total image# to preprocess: ", len(unique_img))
@@ -102,10 +104,13 @@ def extract_feature(img_path, train_flag, image_features_extract_model):
     for img, path in tqdm(image_dataset):
         batch_features = image_features_extract_model(img)
         batch_features = tf.reshape(batch_features,
-                                    (batch_features.shape[0], -1, batch_features.shape[3]))
+                                    (batch_features.shape[0],
+                                     -1, batch_features.shape[3]))
         for f, p in zip(batch_features, path):
             path_of_feature = p.numpy().decode("utf-8")
-            path_of_feature = feature_path(path_of_feature, cate='img', train_flag=train_flag)
+            path_of_feature = feature_path(path_of_feature,
+                                           cate='img',
+                                           train_flag=train_flag)
             np.save(path_of_feature, f.numpy())
 
 
@@ -168,7 +173,7 @@ def main(params):
                                                                           maxlen=maxLen,
                                                                           padding='pre')
     # print(type(all_test_question_vec), all_test_question_vec.shape, all_test_question_vec[0])
-    print(all_test_question_vec.shape, all_train_question_vec.shape, type(all_train_question_vec[0]))
+    # print(all_test_question_vec.shape, all_train_question_vec.shape, type(all_train_question_vec[0]))
     print('tokenizing done!')
 
     # using vgg19 pool5 to extract image feature
@@ -194,9 +199,13 @@ def main(params):
 
     for i in range(len(all_train_img_path)):
         ques_feature = all_train_question_vec[i]
-        ques_feature_path = feature_path(str(i+1), cate='que', train_flag=True)
+        ques_feature_path = feature_path(str(i+1),
+                                         cate='que',
+                                         train_flag=True)
         np.save(ques_feature_path, ques_feature)
-        dict_ = {'img': feature_path(all_train_img_path[i], cate='img', train_flag=True),
+        dict_ = {'img': feature_path(all_train_img_path[i],
+                                     cate='img',
+                                     train_flag=True),
                  'que': ques_feature_path,
                  'ans': all_train_answer[i]}
         train_json.append(dict_)
@@ -207,9 +216,13 @@ def main(params):
 
     for i in range(len(all_test_img_path)):
         ques_feature = all_test_question_vec[i]
-        ques_feature_path = feature_path(str(i+1), cate='que', train_flag=False)
+        ques_feature_path = feature_path(str(i+1),
+                                         cate='que',
+                                         train_flag=False)
         np.save(ques_feature_path, ques_feature)
-        dict_ = {'img': feature_path(all_train_img_path[i], cate='img', train_flag=False),
+        dict_ = {'img': feature_path(all_train_img_path[i],
+                                     cate='img',
+                                     train_flag=False),
                  'que': ques_feature_path}
         test_json.append(dict_)
         if (i+1) % 10000 == 0:

@@ -46,6 +46,7 @@ num_answer = 2000
 
 
 class SAN_LSTM(tf.keras.Model):
+    pass
 
 
 def map_func(img_name, q, a):
@@ -59,14 +60,15 @@ def get_data():
     que_train = []
     ans_train = []
     for item in dataset:
-        img_name_train.append(item['img_path'])
-        que_train.append(np.load(item['que_path']))
+        img_name_train.append(item['img'])
+        que_train.append(np.load(item['que']))
         ans_train.append(item['ans'])
     dataset = tf.data.Dataset.from_tensor_slices((img_name_train,
                                                   que_train,
                                                   ans_train))
-    dataset = dataset.map(lambda item1, item2, item3: tf.numpy_function(
-                            map_func, [item1, item2, item3], [tf.float32, tf.int32, tf.int32]),
+    dataset = dataset.map(lambda item1, item2, item3:
+                          tf.numpy_function(map_func, [item1, item2, item3],
+                                            [tf.float32, tf.int32, tf.int32]),
                           num_parallel_calls=tf.data.experimental.AUTOTUNE)
     dataset = dataset.shuffle(buffer_size).batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.experimental.AUTOTUNE)

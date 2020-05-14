@@ -27,10 +27,10 @@ unzip zip/val2014.zip -d img/
 unzip zip/test2015.zip -d img
 
 echo "Prepare annotation"
-python ./prepro.py
+# python ./prepro.py
 
 echo "Remove useless files"
 rm -r zip
-rm -r annoations
+# rm -r annoations
 
 echo "All Done"
