@@ -18,9 +18,9 @@ train_input_json = "./data/train_data.json"
 test_input_json = "./data/test_data.json"
 
 # train params
-lr = 0.0003
+learning_rate = 0.001
 # lr_decay_start = -1             # when begin to decay lr(-1 never)
-batch_size = 128
+batch_size = 2048
 buffer_size = 1000
 embedding_size = 1024     # encoding size of each token in vocab
 # rnn_size = 256                  # node# each rnn layer
@@ -30,7 +30,7 @@ hidden_dim = 1024               # size of common embedding vector
 dim_attention = 512             # size of attention embedding
 num_output = 2000               # output answer number
 # img_norm = 1                    # whether norm image feature, 1=True
-# decay_factor = 0.99997592083
+decay_factor = 0.99997592083
 
 vocab_size = 16440 + 1
 
@@ -61,7 +61,9 @@ def get_data(batch_size=batch_size):
         img_name_train.append(item['img'])
         que_train.append(np.load(item['que']))
         ans_train.append(item['ans'])
-    num_steps = img_name_train // batch_size
+    num_steps = len(img_name_train) // batch_size
+    print("Total train samples {}, batch size {}, steps for each epoch {}".format(
+            len(img_name_train), batch_size, num_steps))
     dataset = tf.data.Dataset.from_tensor_slices((img_name_train,
                                                   que_train,
                                                   ans_train))
@@ -91,22 +93,22 @@ def train():
                      num_answer=num_output,
                      dim_att=dim_attention)
 
-    optimizer = tf.keras.optimizers.Adam()
-    loss_object = tf.keras.losses.SparseCategoricalCrossentropy(
-        reduction='none')
+    lr = learning_rate
+    optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
+    loss_object = tf.keras.losses.SparseCategoricalCrossentropy()
 
-    checkpoint_path = os.path.join("./checkpoints/train/",
+    checkpoint_path = os.path.join("./checkpoints/",
                                    experiment_name)
     ckpt = tf.train.Checkpoint(model=model,
                                optimizer=optimizer)
-    ckpt_manager = tf.train.CheckpointManager(chekckpoint=ckpt,
-                                              direcotory=checkpoint_path,
+    ckpt_manager = tf.train.CheckpointManager(checkpoint=ckpt,
+                                              directory=checkpoint_path,
                                               max_to_keep=5)
     start_epoch = 0
-    if ckpt_manager.lastest_checkpoint:
-        start_epoch = int(ckpt_manager.lastest_checkpoint.split('-')[-1])
+    if ckpt_manager.latest_checkpoint:
+        start_epoch = int(ckpt_manager.latest_checkpoint.split('-')[-1])
         # restoring the latest checkpoint in checkpoint_path
-        ckpt.restore(ckpt_manager.lastest_checkpoint)
+        ckpt.restore(ckpt_manager.latest_checkpoint)
 
     loss_plot = []
 
@@ -119,28 +121,36 @@ def train():
 
         for (batch, (img_tensor, que_tensor, target)) in enumerate(dataset):
             with tf.GradientTape() as tape:
-                prediction = model(que_tensor, img_tensor)
-                loss = loss_function(target, prediction, loss_object)
+                prediction, layer_1_w, layer_2_w = model(que_tensor, img_tensor)
+                loss = loss_object(target, prediction)
 
-            total_loss += loss
+            if tf.reduce_any(tf.math.is_nan(x)):
+                print(loss.numpy())
+                print(target.numpy())
+                printt(prediction.numpy())
+            total_loss += loss.numpy()
 
             trainable_variables = model.trainable_variables
 
             gradients = tape.gradient(loss, trainable_variables)
+            gradients = [(tf.clip_by_value(grad, -10.0, 10.0)) for grad in gradients]
 
             optimizer.apply_gradients(zip(gradients, trainable_variables))
 
-            if batch % 100 == 0:
-                print('Epoch {} Batch {} {} Loss {:.4f}'.format(
-                        epoch + 1, batch, loss))
+            if batch % 50 == 0:
+                print('Epoch: {} Batch: {} Loss: {:.4f} LR: {:.6f}'.format(
+                        epoch + 1, batch, loss.numpy(), optimizer._decayed_lr(tf.float32)))
+
+            lr = lr * decay_factor
+            optimizer.lr.assign(lr)
+
         loss_plot.append(total_loss / num_steps)
 
-        if epoch % 5 == 0:
-            ckpt_manager.save()
+        ckpt_manager.save()
 
-        print('Epoch {} Loss {:.6f}'.format(epoch + 1, total_loss/num_steps))
+        print('Epoch {} average loss is {:.6f}'.format(epoch + 1, total_loss / num_steps))
         print('Time taken for 1 epoch {} sec\n'.format(time.time() - start))
-
+    print("Training Done!")
 
 if __name__ == '__main__':
     train()

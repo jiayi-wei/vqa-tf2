@@ -2,21 +2,23 @@ import tensorflow as tf
 
 
 class att_Module(tf.keras.Model):
-    def __init__(self, units, attention_dim):
+    def __init__(self, units, attention_dim, drop_out_rate=0.2):
         super(att_Module, self).__init__()
         self.W_I = tf.keras.layers.Dense(attention_dim, use_bias=False)
         self.W_Q = tf.keras.layers.Dense(attention_dim)
         self.W_p = tf.keras.layers.Dense(1)
+        self.h_A_dropout = tf.keras.layers.Dropout(rate=drop_out_rate)
 
     def call(self, v_I, v_Q):
         # v_I shape (B, dim*dim, units)
         # v_Q shape (B, units)
-        v_I_att = self.W_I(v_I)
-        v_Q_att = self.W_Q(v_Q)
+        v_I_att = tf.nn.tanh(self.W_I(v_I))
+        v_Q_att = tf.nn.tanh(self.W_Q(v_Q))
 
         v_Q_att = tf.expand_dims(v_Q_att, axis=1)
         # expand v_Q_att to shape (B, 1, units)
         h_A = tf.nn.tanh(v_I_att + v_Q_att)
+        h_A = self.h_A_dropout(h_A)
         # h_A shape (B, dim*dim, units)
 
         p_I = self.W_p(h_A)
@@ -48,7 +50,8 @@ class SAN_LSTM(tf.keras.Model):
                  units,
                  vocab_size,
                  num_answer,
-                 dim_att):
+                 dim_att,
+                 drop_out_rate=0.2):
         # units is the hidden_units#
         # vocab_size
         # num_answer
@@ -63,6 +66,7 @@ class SAN_LSTM(tf.keras.Model):
         self.att1 = att_Module(units, dim_att)
         self.att2 = att_Module(units, dim_att)
 
+        self.u_dropout = tf.keras.layers.Dropout(rate=drop_out_rate)
         self.ans_fc = tf.keras.layers.Dense(num_answer)
 
     def imgModel(self, img):
@@ -94,5 +98,6 @@ class SAN_LSTM(tf.keras.Model):
         v_img = self.imgModel(img)
         v_que = self.queModel(q)
         img_weights_1, img_weights_2, u = self.attModel(v_img, v_que)
+        u = self.u_dropout(u)
         output = tf.nn.softmax(self.ans_fc(u))
         return output, img_weights_1, img_weights_2

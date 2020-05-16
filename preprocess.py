@@ -90,7 +90,7 @@ def feature_path(p, cate, train_flag):
     return os.path.join(directory, name)
 
 
-def extract_feature(img_path, train_flag, image_features_extract_model):
+def extract_feature(img_path, train_flag, image_features_extract_model, params):
     # feature is in shape of [7*7, 512]
 
     unique_img = list(set(img_path))
@@ -99,7 +99,7 @@ def extract_feature(img_path, train_flag, image_features_extract_model):
 
     image_dataset = tf.data.Dataset.from_tensor_slices(unique_img)
     image_dataset = image_dataset.map(
-        load_image, num_parallel_calls=tf.data.experimental.AUTOTUNE).batch(8)
+        load_image, num_parallel_calls=tf.data.experimental.AUTOTUNE).batch(params['extract_batch_size'])
 
     for img, path in tqdm(image_dataset):
         batch_features = image_features_extract_model(img)
@@ -186,11 +186,11 @@ def main(params):
 
     # extract image features
     # Train
-    extract_feature(all_train_img_path, True, image_features_extract_model)
+    extract_feature(all_train_img_path, True, image_features_extract_model, params)
     print("train image done.")
 
     # Test
-    # extract_feature(all_test_img_path, False, image_features_extract_model)
+    # extract_feature(all_test_img_path, False, image_features_extract_model, params)
     print("test image done.")
 
     # save tokenized question
@@ -209,8 +209,8 @@ def main(params):
                  'que': ques_feature_path,
                  'ans': all_train_answer[i]}
         train_json.append(dict_)
-        if (i+1) % 10000 == 0:
-            print("train write {}%".format((i+1)*100.0 / len(all_train_img_path)))
+        if (i+1) % 100000 == 0:
+            print("train write {:.4f}%".format((i+1)*100.0 / len(all_train_img_path)))
     json.dump(train_json, open(params['output_train_json'], 'w'))
     print('train write done')
 
@@ -226,7 +226,7 @@ def main(params):
                  'que': ques_feature_path}
         test_json.append(dict_)
         if (i+1) % 10000 == 0:
-            print("test write {}%".format((i+1)*100.0 / len(all_test_img_path)))
+            print("test write {:.4f}%".format((i+1)*100.0 / len(all_test_img_path)))
     json.dump(test_json, open(params['output_test_json'], 'w'))
     print('test write done')
 
@@ -245,6 +245,8 @@ if __name__ == '__main__':
 
     parser.add_argument('--output_train_json', default='./data/train_data.json')
     parser.add_argument('--output_test_json', default='./data/test_data.json')
+
+    parser.add_argument("--extract_batch_size", default=16, type=int)
 
     args = parser.parse_args()
     params = vars(args)

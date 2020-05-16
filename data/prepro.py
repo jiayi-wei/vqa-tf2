@@ -88,4 +88,4 @@ if __name__ == "__main__":
     params = vars(args)
     main(params)
 
-    os.system("rm -r annoations")
+    os.system("rm -r annotations")
