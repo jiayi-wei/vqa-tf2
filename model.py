@@ -1,4 +1,4 @@
-import tensorflowr as tf
+import tensorflow as tf
 
 
 class att_Module(tf.keras.Model):
