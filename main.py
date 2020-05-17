@@ -18,7 +18,7 @@ train_input_json = "./data/train_data.json"
 test_input_json = "./data/test_data.json"
 
 # train params
-learning_rate = 0.001
+learning_rate = 0.01
 # lr_decay_start = -1             # when begin to decay lr(-1 never)
 batch_size = 2048
 buffer_size = 1000
@@ -93,11 +93,11 @@ def train():
                      num_answer=num_output,
                      dim_att=dim_attention)
 
-    lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+    lr_schedule = tf.keras.optimizers.schedules.PolynomialDecay(
         initial_learning_rate=learning_rate,
-        decay_steps=10,
-        decay_rate=0.96,
-        staircase=True)
+        decay_steps=1000,
+        end_learning_rate=0.00001,
+        power=0.5)
     optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
     loss_object = tf.keras.losses.SparseCategoricalCrossentropy()
 
@@ -129,11 +129,12 @@ def train():
                                                          img_tensor)
                 loss = loss_object(target, prediction)
 
+            total_loss += loss.numpy()
             if tf.reduce_any(tf.math.is_nan(loss)):
                 print(loss.numpy())
                 print(target.numpy())
                 print(prediction.numpy())
-            total_loss += loss.numpy()
+                quit()
 
             trainable_variables = model.trainable_variables
 
@@ -154,6 +155,7 @@ def train():
         print('Epoch {} average loss is {:.6f}'.format(epoch + 1,
                                                        total_loss / num_steps))
         print('Time taken for 1 epoch {} sec\n'.format(time.time() - start))
+    np.save(os.path.join(checkpoint_path, "loss.npy"), loss_plot)
     print("Training Done!")
 
 
