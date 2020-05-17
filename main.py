@@ -93,11 +93,11 @@ def train():
                      num_answer=num_output,
                      dim_att=dim_attention)
 
-    lr_schedule = keras.optimizers.schedules.ExponentialDecay(
-                        initial_learning_rate = learning_rate,
-                        decay_steps=10,
-                        decay_rate=0.96,
-                        staircase=True)
+    lr_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+        initial_learning_rate=learning_rate,
+        decay_steps=10,
+        decay_rate=0.96,
+        staircase=True)
     optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
     loss_object = tf.keras.losses.SparseCategoricalCrossentropy()
 
@@ -125,13 +125,14 @@ def train():
 
         for (batch, (img_tensor, que_tensor, target)) in enumerate(dataset):
             with tf.GradientTape() as tape:
-                prediction, layer_1_w, layer_2_w = model(que_tensor, img_tensor)
+                prediction, layer_1_w, layer_2_w = model(que_tensor,
+                                                         img_tensor)
                 loss = loss_object(target, prediction)
 
-            if tf.reduce_any(tf.math.is_nan(x)):
+            if tf.reduce_any(tf.math.is_nan(loss)):
                 print(loss.numpy())
                 print(target.numpy())
-                printt(prediction.numpy())
+                print(prediction.numpy())
             total_loss += loss.numpy()
 
             trainable_variables = model.trainable_variables
@@ -143,18 +144,18 @@ def train():
 
             if batch % 50 == 0:
                 print('Epoch: {} Batch: {} Loss: {:.4f} LR: {:.6f}'.format(
-                        epoch + 1, batch, loss.numpy(), optimizer._decayed_lr(tf.float32)))
-
-            lr = lr * decay_factor
-            optimizer.lr.assign(lr)
+                        epoch + 1, batch, loss.numpy(),
+                        optimizer._decayed_lr(tf.float32)))
 
         loss_plot.append(total_loss / num_steps)
 
         ckpt_manager.save()
 
-        print('Epoch {} average loss is {:.6f}'.format(epoch + 1, total_loss / num_steps))
+        print('Epoch {} average loss is {:.6f}'.format(epoch + 1,
+                                                       total_loss / num_steps))
         print('Time taken for 1 epoch {} sec\n'.format(time.time() - start))
     print("Training Done!")
+
 
 if __name__ == '__main__':
     train()

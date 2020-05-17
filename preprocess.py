@@ -32,7 +32,8 @@ def filter_data(data, ans_to_idx):
     for i, item in enumerate(data):
         if item['answer'] in ans_to_idx.keys():
             new_data.append(item)
-    print("training samples reduce from {} to {}".format(len(data), len(new_data)))
+    print("training samples reduce from {} to {}".format(len(data),
+                                                         len(new_data)))
     return new_data
 
 
@@ -90,7 +91,10 @@ def feature_path(p, cate, train_flag):
     return os.path.join(directory, name)
 
 
-def extract_feature(img_path, train_flag, image_features_extract_model, params):
+def extract_feature(img_path,
+                    train_flag,
+                    image_features_extract_model,
+                    params):
     # feature is in shape of [7*7, 512]
 
     unique_img = list(set(img_path))
@@ -186,11 +190,17 @@ def main(params):
 
     # extract image features
     # Train
-    extract_feature(all_train_img_path, True, image_features_extract_model, params)
+    extract_feature(all_train_img_path,
+                    True,
+                    image_features_extract_model,
+                    params)
     print("train image done.")
 
     # Test
-    # extract_feature(all_test_img_path, False, image_features_extract_model, params)
+    # extract_feature(all_test_img_path,
+    #                  False,
+    #                  image_features_extract_model,
+    #                  params)
     print("test image done.")
 
     # save tokenized question
