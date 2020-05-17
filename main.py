@@ -18,9 +18,9 @@ train_input_json = "./data/train_data.json"
 test_input_json = "./data/test_data.json"
 
 # train params
-learning_rate = 0.01
+learning_rate = 0.0005
 # lr_decay_start = -1             # when begin to decay lr(-1 never)
-batch_size = 2048
+batch_size = 2000
 buffer_size = 1000
 embedding_size = 1024     # encoding size of each token in vocab
 # rnn_size = 256                  # node# each rnn layer
@@ -35,14 +35,14 @@ decay_factor = 0.99997592083
 vocab_size = 16440 + 1
 
 # check point
-experiment_name = 'san_lstm'
+experiment_name = 'san_lstm_2'
 
 # misc
 # gpu_id = 0
 # max_itr = 75001
 n_epochs = 200
 max_words_q = 22
-num_answer = 2000
+num_answer = 2000 + 1
 
 ###################
 
@@ -93,12 +93,14 @@ def train():
                      num_answer=num_output,
                      dim_att=dim_attention)
 
-    lr_schedule = tf.keras.optimizers.schedules.PolynomialDecay(
-        initial_learning_rate=learning_rate,
-        decay_steps=1000,
-        end_learning_rate=0.00001,
-        power=0.5)
-    optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
+    # lr_schedule = tf.keras.optimizers.schedules.PolynomialDecay(
+    #     initial_learning_rate=learning_rate,
+    #    decay_steps=30000,
+    #    end_learning_rate=0.00001,
+    #    power=0.5)
+    lr = learning_rate
+
+    optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
     loss_object = tf.keras.losses.SparseCategoricalCrossentropy()
 
     checkpoint_path = os.path.join("./checkpoints/",
@@ -124,17 +126,20 @@ def train():
         total_loss = 0.0
 
         for (batch, (img_tensor, que_tensor, target)) in enumerate(dataset):
+            # print(batch)
             with tf.GradientTape() as tape:
                 prediction, layer_1_w, layer_2_w = model(que_tensor,
                                                          img_tensor)
+                # prediction = tf.clip_by_value(prediction, 1e-10, 1.0)
                 loss = loss_object(target, prediction)
 
             total_loss += loss.numpy()
-            if tf.reduce_any(tf.math.is_nan(loss)):
-                print(loss.numpy())
-                print(target.numpy())
-                print(prediction.numpy())
-                quit()
+            # if tf.reduce_any(tf.math.is_nan(loss)):
+            #    np.save("pred.npy", prediction.numpy())
+            #    np.save("targ.npy", target.numpy())
+            #    print(tf.reduce_max(prediction), tf.reduce_min(prediction))
+            #    print(tf.reduce_any(tf.math.is_nan(prediction)))
+            #    quit()
 
             trainable_variables = model.trainable_variables
 
@@ -146,7 +151,9 @@ def train():
             if batch % 50 == 0:
                 print('Epoch: {} Batch: {} Loss: {:.4f} LR: {:.6f}'.format(
                         epoch + 1, batch, loss.numpy(),
-                        optimizer._decayed_lr(tf.float32)))
+                        optimizer.lr.numpy()))
+            lr = lr * decay_factor
+            optimizer.lr.assign(lr)
 
         loss_plot.append(total_loss / num_steps)
 

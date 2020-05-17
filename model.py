@@ -14,12 +14,14 @@ class att_Module(tf.keras.Model):
         # v_Q shape (B, units)
         v_I_att = tf.nn.tanh(self.W_I(v_I))
         v_Q_att = tf.nn.tanh(self.W_Q(v_Q))
+        # v_I shape (B, dim*dim, att_dim)
+        # v_Q shape (B, att_dim)
 
         v_Q_att = tf.expand_dims(v_Q_att, axis=1)
-        # expand v_Q_att to shape (B, 1, units)
+        # expand v_Q_att to shape (B, 1, att_dim)
         h_A = tf.nn.tanh(v_I_att + v_Q_att)
         h_A = self.h_A_dropout(h_A)
-        # h_A shape (B, dim*dim, units)
+        # h_A shape (B, dim*dim, att_dim)
 
         p_I = self.W_p(h_A)
         # p_I shape (B, dim*dim, 1)
@@ -99,5 +101,9 @@ class SAN_LSTM(tf.keras.Model):
         v_que = self.queModel(q)
         img_weights_1, img_weights_2, u = self.attModel(v_img, v_que)
         u = self.u_dropout(u)
-        output = tf.nn.softmax(self.ans_fc(u))
+        # print(u)
+        output = self.ans_fc(u)
+        # print(output)
+        output = tf.nn.softmax(output)
+        # print(output)
         return output, img_weights_1, img_weights_2
