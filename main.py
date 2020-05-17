@@ -93,8 +93,12 @@ def train():
                      num_answer=num_output,
                      dim_att=dim_attention)
 
-    lr = learning_rate
-    optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
+    lr_schedule = keras.optimizers.schedules.ExponentialDecay(
+                        initial_learning_rate = learning_rate,
+                        decay_steps=10,
+                        decay_rate=0.96,
+                        staircase=True)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=lr_schedule)
     loss_object = tf.keras.losses.SparseCategoricalCrossentropy()
 
     checkpoint_path = os.path.join("./checkpoints/",
