@@ -4,7 +4,8 @@ import tensorflow as tf
 import numpy as np
 import time
 import json
-from model import *
+# from model import *
+from model_2lstm import *
 import os
 
 
@@ -20,7 +21,7 @@ test_input_json = "./data/test_data.json"
 # train params
 learning_rate = 0.0005
 # lr_decay_start = -1             # when begin to decay lr(-1 never)
-batch_size = 2000
+batch_size = 512
 buffer_size = 1000
 embedding_size = 1024     # encoding size of each token in vocab
 # rnn_size = 256                  # node# each rnn layer
@@ -28,21 +29,21 @@ embedding_size = 1024     # encoding size of each token in vocab
 # dim_image = 512
 hidden_dim = 1024               # size of common embedding vector
 dim_attention = 512             # size of attention embedding
-num_output = 2000               # output answer number
+num_output = 2000 + 1              # output answer number
 # img_norm = 1                    # whether norm image feature, 1=True
 decay_factor = 0.99997592083
 
 vocab_size = 16440 + 1
 
 # check point
-experiment_name = 'san_lstm_2'
+experiment_name = 'san_2lstm'
 
 # misc
 # gpu_id = 0
 # max_itr = 75001
 n_epochs = 200
 max_words_q = 22
-num_answer = 2000 + 1
+# num_answer = 2000 + 1
 
 ###################
 
@@ -134,12 +135,12 @@ def train():
                 loss = loss_object(target, prediction)
 
             total_loss += loss.numpy()
-            # if tf.reduce_any(tf.math.is_nan(loss)):
-            #    np.save("pred.npy", prediction.numpy())
-            #    np.save("targ.npy", target.numpy())
-            #    print(tf.reduce_max(prediction), tf.reduce_min(prediction))
-            #    print(tf.reduce_any(tf.math.is_nan(prediction)))
-            #    quit()
+            if tf.reduce_any(tf.math.is_nan(loss)):
+                np.save("pred.npy", prediction.numpy())
+                np.save("targ.npy", target.numpy())
+                print(tf.reduce_max(prediction), tf.reduce_min(prediction))
+                print(tf.reduce_any(tf.math.is_nan(prediction)))
+                quit()
 
             trainable_variables = model.trainable_variables
 

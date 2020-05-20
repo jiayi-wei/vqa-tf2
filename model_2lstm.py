@@ -62,8 +62,6 @@ class SAN_LSTM(tf.keras.Model):
         self.img_fc = tf.keras.layers.Dense(units)
 
         self.embedding = tf.keras.layers.Embedding(vocab_size, embedding_dim)
-        self.lstm = tf.keras.layers.LSTM(units,
-                                         recurrent_initializer='glorot_uniform')
         # self.lstm_1 = tf.keras.layers.LSTM(units,
         #                                   return_sequences=True,
         #                                   return_state=True,
@@ -74,9 +72,9 @@ class SAN_LSTM(tf.keras.Model):
         #                                   return_state=True,
         #                                   stateful=True,
         #                                   recurrent_initializer='glorot_uniform')
-        # lstm_cells = [tf.keras.layers.LSTMCell(units) for _ in range(2)]
-        # stacked_lstm = tf.keras.layers.StackedRNNCells(lstm_cells)
-        # self.lstm_layer = tf.keras.layers.RNN(stacked_lstm)
+        lstm_cells = [tf.keras.layers.LSTMCell(units) for _ in range(2)]
+        stacked_lstm = tf.keras.layers.StackedRNNCells(lstm_cells)
+        self.lstm_layer = tf.keras.layers.RNN(stacked_lstm)
 
         self.att1 = att_Module(units, dim_att)
         self.att2 = att_Module(units, dim_att)
@@ -101,8 +99,8 @@ class SAN_LSTM(tf.keras.Model):
         # hidden_1 = self.lstm_1.reset_states(q.shape[0])
         # hidden_2 = self.lstm_2.reset_states(q.shape[0])
 
-        hidden = self.lstm(ques_enc)
-        # hidden = self.lstm_layer(ques_enc)
+        # hidden = self.lstm(ques_enc)
+        hidden = self.lstm_layer(ques_enc)
         # hidden shape (B, units)
         return hidden
 
