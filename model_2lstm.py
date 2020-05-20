@@ -2,12 +2,17 @@ import tensorflow as tf
 
 
 class att_Module(tf.keras.Model):
-    def __init__(self, units, attention_dim, drop_out_rate=0.2):
+    def __init__(self,
+                 units,
+                 attention_dim,
+                 drop_out_rate=0.2,
+                 training=True):
         super(att_Module, self).__init__()
         self.W_I = tf.keras.layers.Dense(attention_dim, use_bias=False)
         self.W_Q = tf.keras.layers.Dense(attention_dim)
         self.W_p = tf.keras.layers.Dense(1)
         self.h_A_dropout = tf.keras.layers.Dropout(rate=drop_out_rate)
+        self.training=training
 
     def call(self, v_I, v_Q):
         # v_I shape (B, dim*dim, units)
@@ -20,7 +25,7 @@ class att_Module(tf.keras.Model):
         v_Q_att = tf.expand_dims(v_Q_att, axis=1)
         # expand v_Q_att to shape (B, 1, att_dim)
         h_A = tf.nn.tanh(v_I_att + v_Q_att)
-        h_A = self.h_A_dropout(h_A)
+        h_A = self.h_A_dropout(h_A, training=self.training)
         # h_A shape (B, dim*dim, att_dim)
 
         p_I = self.W_p(h_A)
@@ -48,12 +53,14 @@ class att_Module(tf.keras.Model):
 
 
 class SAN_LSTM(tf.keras.Model):
-    def __init__(self, embedding_dim,
+    def __init__(self,
+                 embedding_dim,
                  units,
                  vocab_size,
                  num_answer,
                  dim_att,
-                 drop_out_rate=0.2):
+                 drop_out_rate=0.2,
+                 training=True):
         # units is the hidden_units#
         # vocab_size
         # num_answer
@@ -76,10 +83,12 @@ class SAN_LSTM(tf.keras.Model):
         stacked_lstm = tf.keras.layers.StackedRNNCells(lstm_cells)
         self.lstm_layer = tf.keras.layers.RNN(stacked_lstm)
 
-        self.att1 = att_Module(units, dim_att)
-        self.att2 = att_Module(units, dim_att)
+        self.att1 = att_Module(units, dim_att, training=training)
+        self.att2 = att_Module(units, dim_att, training=training)
 
         self.u_dropout = tf.keras.layers.Dropout(rate=drop_out_rate)
+        self.training=training
+
         self.ans_fc = tf.keras.layers.Dense(num_answer)
 
     def imgModel(self, img):
@@ -115,7 +124,7 @@ class SAN_LSTM(tf.keras.Model):
         v_img = self.imgModel(img)
         v_que = self.queModel(q)
         img_weights_1, img_weights_2, u = self.attModel(v_img, v_que)
-        u = self.u_dropout(u)
+        u = self.u_dropout(u, training=self.training)
         # print(u)
         output = self.ans_fc(u)
         # print(output)

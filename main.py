@@ -21,8 +21,8 @@ test_input_json = "./data/test_data.json"
 # train params
 learning_rate = 0.0005
 # lr_decay_start = -1             # when begin to decay lr(-1 never)
-batch_size = 512
-buffer_size = 1000
+batch_size = 1180        # 256 + 512
+buffer_size = 3000
 embedding_size = 1024     # encoding size of each token in vocab
 # rnn_size = 256                  # node# each rnn layer
 # rnn_layer = 2
@@ -36,13 +36,13 @@ decay_factor = 0.99997592083
 vocab_size = 16440 + 1
 
 # check point
-experiment_name = 'san_2lstm'
+experiment_name = 'san_2lstm_all'
 
 # misc
 # gpu_id = 0
 # max_itr = 75001
 n_epochs = 200
-max_words_q = 22
+# max_words_q = 22
 # num_answer = 2000 + 1
 
 ###################
@@ -50,6 +50,7 @@ max_words_q = 22
 
 def map_func(img_name, q, a):
     img_tensor = np.load(img_name.decode('utf-8'))
+    q = np.load(q)
     return img_tensor, q, a
 
 
@@ -60,7 +61,8 @@ def get_data(batch_size=batch_size):
     ans_train = []
     for item in dataset:
         img_name_train.append(item['img'])
-        que_train.append(np.load(item['que']))
+        # que_train.append(np.load(item['que']))
+        que_train.append(item['que'])
         ans_train.append(item['ans'])
     num_steps = len(img_name_train) // batch_size
     print("Total train samples {}, batch size {}, steps for each epoch {}".format(
@@ -110,7 +112,7 @@ def train():
                                optimizer=optimizer)
     ckpt_manager = tf.train.CheckpointManager(checkpoint=ckpt,
                                               directory=checkpoint_path,
-                                              max_to_keep=5)
+                                              max_to_keep=10)
     start_epoch = 0
     if ckpt_manager.latest_checkpoint:
         start_epoch = int(ckpt_manager.latest_checkpoint.split('-')[-1])
@@ -149,7 +151,7 @@ def train():
 
             optimizer.apply_gradients(zip(gradients, trainable_variables))
 
-            if batch % 50 == 0:
+            if batch % 100 == 0:
                 print('Epoch: {} Batch: {} Loss: {:.4f} LR: {:.6f}'.format(
                         epoch + 1, batch, loss.numpy(),
                         optimizer.lr.numpy()))
@@ -157,8 +159,8 @@ def train():
             optimizer.lr.assign(lr)
 
         loss_plot.append(total_loss / num_steps)
-
         ckpt_manager.save()
+        np.save(os.path.join(checkpoint_path, "loss_tmp.npy"), loss_plot)
 
         print('Epoch {} average loss is {:.6f}'.format(epoch + 1,
                                                        total_loss / num_steps))

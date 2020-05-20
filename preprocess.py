@@ -256,7 +256,7 @@ if __name__ == '__main__':
     parser.add_argument('--output_train_json', default='./data/train_data.json')
     parser.add_argument('--output_test_json', default='./data/test_data.json')
 
-    parser.add_argument("--extract_batch_size", default=16, type=int)
+    parser.add_argument("--extract_batch_size", default=64, type=int)
 
     args = parser.parse_args()
     params = vars(args)
