@@ -162,8 +162,10 @@ def main(params):
     tokenizer.fit_on_texts(all_train_question)
     tokenizer.word_index['<pad>'] = 0
     tokenizer.index_word[0] = '<pad>'
-    word_idx = tokenizer.get_config()
-    json.dump(word_idx, open('./data/word_idx.json', 'w'))
+    json_string = tokenizer.to_json()
+    json_string_file = open("./data/tokenizer.txt", 'w')
+    json_string_file.write(json_string)
+    json_string_file.close()
 
     all_train_question_seq = tokenizer.texts_to_sequences(all_train_question)
     all_test_question_seq = tokenizer.texts_to_sequences(all_test_question)
@@ -181,19 +183,21 @@ def main(params):
     print('tokenizing done!')
 
     # using vgg19 pool5 to extract image feature
-    image_model = tf.keras.applications.VGG19(include_top=False,
+
+    image_features_extract_model = tf.keras.applications.VGG19(include_top=False,
                                               weights='imagenet')
     new_input = image_model.input
     hidden_layer = image_model.layers[-1].output
     image_features_extract_model = tf.keras.Model(new_input, hidden_layer)
     print("image model ready")
 
+
     # extract image features
     # Train
-    extract_feature(all_train_img_path,
-                    True,
-                    image_features_extract_model,
-                    params)
+    # extract_feature(all_train_img_path,
+    #                True,
+    #                image_features_extract_model,
+    #                params)
     print("train image done.")
 
     # Test

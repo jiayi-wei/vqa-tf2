@@ -56,18 +56,20 @@ def get_data(json_file,
     num_steps = len(img_name_test) // batch_size
     print("Total test samples {}, batch_size {}, steps needed {}".format(
             len(img_name_test), batch_size, num_steps))
-    dataset = tf.data.Dataset.from_tensor_slice((img_name_test,
-                                                 que_test,
-                                                 ans_test))
+    dataset = tf.data.Dataset.from_tensor_slices((img_name_test,
+                                                  que_test,
+                                                  ans_test))
     if with_target:
         dataset = dataset.map(lambda item1, item2, item3: tf.numpy_function(map_func,
-                                                                            [item1, item2, item3]),
+                                                                            [item1, item2, item3],
+                                                                            [tf.float32, tf.int32, tf.int32, tf.string]),
                               num_parallel_calls=tf.data.experimental.AUTOTUNE)
     else:
         dataset = dataset.map(lambda item1, item2: tf.numpy_function(map_func_no_target,
-                                                                     [item1, item2]),
+                                                                     [item1, item2],
+                                                                     [tf.float32, tf.int32, tf.int32, tf.string]),
                               num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    dataset = dataset.batch_size(batch_size).prefetch(
+    dataset = dataset.batch(batch_size).prefetch(
         buffer_size=tf.data.experimental.AUTOTUNE)
     return dataset
 
@@ -89,44 +91,74 @@ def test():
                      dim_att=dim_attention,
                      training=False)
 
+    # using the restore method to restore model
+    # from the latest checkpoint
     checkpoint_path = os.path.join("./checkpoints",
                                    experimental_name)
     latest = tf.train.latest_checkpoint(checkpoint_path)
-    model.loat_weights(latest)
 
+    ckpt = tf.train.Checkpoint(model=model)
+    ckpt.restore(latest).expect_partial()
+
+    # params to save eval results
     correct, total = 0, 0
     res = []
-    idx_to_ans = json.load("./data/idx_to_ans.json")
-    tokenizer = tf.keras.preprocessing.text.tokenizer_from_json("./data/word_idx.json")
+
+    # restore tokenizer
+    with open("./data/tokenizer.txt", 'r') as file:
+        json_str = file.readline()
+    tokenizer = tf.keras.preprocessing.text.tokenizer_from_json(json_str)
+
+    # restore idx to ans
+    with open("./data/idx_to_ans.json", 'r') as file:
+        idx_to_ans = json.load(file)
 
     extention = "train" if with_target else "test"
     save_path = os.path.join(checkpoint_path, extention)
-    if not os.path.exists(save_path):
-        os.mkdir(save_path)
     w1_path = os.path.join(save_path, 'w1')
     w2_path = os.path.join(save_path, 'w2')
     res_path = os.path.join(save_path, 'res.json')
 
+    if not os.path.exists(save_path):
+        os.mkdir(save_path)
+        os.mkdir(w1_path)
+        os.mkdir(w2_path)
+
     img_path_sub = "./data/img/{}/"
+
     for (batch, (img_tensor, que_tensor, target, img_path)) in enumerate(dataset):
         prediction, layer_1_w, layer_2_w = model(que_tensor,
                                                  img_tensor)
         prediction = tf.math.argmax(prediction, axis=1)
+        prediction = tf.cast(prediction, dtype=tf.int32)
 
         for i in range(prediction.shape[0]):
+            # save prediction results one by one
+
             if with_target:
                 total += 1
                 if prediction[i] == target[i]:
                     correct += 1
+
             name = "{:04d}_{:04d}_".format(batch, i)
+
+            # save attention weights
             w1 = layer_1_w[i].numpy()
             w1_path_here = os.path.join(w1_path, name+"w1.npy")
-            np.load(w1_path_here, w1)
+            np.save(w1_path_here, w1)
             w2 = layer_2_w[i].numpy()
             w2_path_here = os.path.join(w2_path, name+"w2.npy")
-            np.load(w2_path_here, w2)
-            que = que_tensor[i]
-            que = tokenizer.sequences_to_texts(que)
+            np.save(w2_path_here, w2)
+
+            # convert question tensor to question
+            que = que_tensor[i].numpy()
+            clean_que = []
+            for idx in que:
+                if idx != 0:
+                    clean_que.append(idx)
+            clean_que = tokenizer.sequences_to_texts([np.array(clean_que)])[0]
+
+            # image path
             fig_path = str(img_path[i].numpy())
             if "train2014" in fig_path:
                 cat = "train2014"
@@ -140,22 +172,31 @@ def test():
             ext = fig_path.split("/")[-1]
             ext = ext.split(".")[0]
             fig_path = img_path_sub.format(cat) + ext + ".jpg"
+
+            # convert ans idx to ans
             ans = target[i].numpy()
             if with_target:
-                ans = idx_to_ans[ans]
+                ans = idx_to_ans[str(ans)]
             else:
                 ans = "None"
             pred = prediction[i].numpy()
-            pred = idx_to_ans[pred]
+            pred = idx_to_ans[str(pred)]
+
+            # build results dictionary
             dic_ = {"w1": w1_path_here,
                     "w2": w2_path_here,
-                    "que": que,
+                    "que": clean_que,
                     "ans": ans,
                     "pre": pred,
                     "img": fig_path}
             res.append(dic_)
-    print("Accu {}".format(correct / total))
-    json.dump(res_path, res)
+
+    print("Batch: ", batch)
+
+    # save results
+    if with_target:
+        print("Accu {}".format(correct / total))
+    json.dump(res, open(res_path, 'w'))
 
 
 if __name__ == "__main__":
