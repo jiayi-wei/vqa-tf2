@@ -34,10 +34,10 @@ def map_func_no_target(img_name, q):
     return img_tensor, q, a, img_name
 
 
-def map_func(img_name, q, a):
+def map_func(img_name, q, a, qid):
     img_tensor = np.load(img_name.decode('utf-8'))
     q = np.load(q)
-    return img_tensor, q, a, img_name
+    return img_tensor, q, a, qid, img_name
 
 
 def get_data(json_file,
@@ -46,29 +46,33 @@ def get_data(json_file,
     dataset = json.load(open(json_file, 'r'))
     img_name_test = []
     que_test = []
-    if with_target:
-        ans_test = []
+    q_id = []
+    ans_test = []
+
     for item in dataset:
         img_name_test.append(item['img'])
         que_test.append(item['que'])
+        q_id.append(item['id'])
         if with_target:
             ans_test.append(item['ans'])
+        else:
+            ans_test.append(-1)
     num_steps = len(img_name_test) // batch_size
     print("Total test samples {}, batch_size {}, steps needed {}".format(
             len(img_name_test), batch_size, num_steps))
     dataset = tf.data.Dataset.from_tensor_slices((img_name_test,
                                                   que_test,
-                                                  ans_test))
-    if with_target:
-        dataset = dataset.map(lambda item1, item2, item3: tf.numpy_function(map_func,
-                                                                            [item1, item2, item3],
-                                                                            [tf.float32, tf.int32, tf.int32, tf.string]),
-                              num_parallel_calls=tf.data.experimental.AUTOTUNE)
-    else:
-        dataset = dataset.map(lambda item1, item2: tf.numpy_function(map_func_no_target,
-                                                                     [item1, item2],
-                                                                     [tf.float32, tf.int32, tf.int32, tf.string]),
-                              num_parallel_calls=tf.data.experimental.AUTOTUNE)
+                                                  ans_test,
+                                                  q_id))
+    dataset = dataset.map(lambda item1, item2, item3, item4: tf.numpy_function(map_func,
+                                                        [item1, item2, item3, item4],
+                                                        [tf.float32, tf.int32, tf.int32, tf.string, tf.string]),
+                                            num_parallel_calls=tf.data.experimental.AUTOTUNE)
+    # else:
+    #    dataset = dataset.map(lambda item1, item2: tf.numpy_function(map_func_no_target,
+    #                                                                 [item1, item2],
+    #                                                                 [tf.float32, tf.int32, tf.int32, tf.string]),
+    #                          num_parallel_calls=tf.data.experimental.AUTOTUNE)
     dataset = dataset.batch(batch_size).prefetch(
         buffer_size=tf.data.experimental.AUTOTUNE)
     return dataset
@@ -126,7 +130,7 @@ def test():
 
     img_path_sub = "./data/img/{}/"
 
-    for (batch, (img_tensor, que_tensor, target, img_path)) in enumerate(dataset):
+    for (batch, (img_tensor, que_tensor, target, qid, img_path)) in enumerate(dataset):
         prediction, layer_1_w, layer_2_w = model(que_tensor,
                                                  img_tensor)
         prediction = tf.math.argmax(prediction, axis=1)

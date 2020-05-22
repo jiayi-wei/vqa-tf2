@@ -139,19 +139,22 @@ def main(params):
     all_train_img_path = []
     all_train_question = []
     all_train_answer = []
+    all_train_id = []
 
     all_test_img_path = []
     all_test_question = []
+    all_test_id = []
 
     for item in trains:
         all_train_img_path.append(item['img_path'])
         all_train_question.append(item['question'])
         all_train_answer.append(ans_to_idx[item['answer']])
+        all_train_id.append(item['ques_id'])
 
     for item in tests:
         all_test_img_path.append(item['img_path'])
         all_test_question.append(item['question'])
-
+        all_test_id.append(item['ques_id'])
     # get top_k words in train
     # words_stat(trains)  # 16442 words
 
@@ -184,13 +187,12 @@ def main(params):
 
     # using vgg19 pool5 to extract image feature
 
-    image_features_extract_model = tf.keras.applications.VGG19(include_top=False,
+    image_model = tf.keras.applications.VGG19(include_top=False,
                                               weights='imagenet')
     new_input = image_model.input
     hidden_layer = image_model.layers[-1].output
     image_features_extract_model = tf.keras.Model(new_input, hidden_layer)
     print("image model ready")
-
 
     # extract image features
     # Train
@@ -201,10 +203,10 @@ def main(params):
     print("train image done.")
 
     # Test
-    # extract_feature(all_test_img_path,
-    #                  False,
-    #                  image_features_extract_model,
-    #                  params)
+    extract_feature(all_test_img_path,
+                    False,
+                    image_features_extract_model,
+                    params)
     print("test image done.")
 
     # save tokenized question
@@ -221,7 +223,8 @@ def main(params):
                                      cate='img',
                                      train_flag=True),
                  'que': ques_feature_path,
-                 'ans': all_train_answer[i]}
+                 'ans': all_train_answer[i],
+                 'id': all_train_id[i]}
         train_json.append(dict_)
         if (i+1) % 100000 == 0:
             print("train write {:.4f}%".format((i+1)*100.0 / len(all_train_img_path)))
@@ -237,7 +240,8 @@ def main(params):
         dict_ = {'img': feature_path(all_train_img_path[i],
                                      cate='img',
                                      train_flag=False),
-                 'que': ques_feature_path}
+                 'que': ques_feature_path,
+                 'id': all_test_id[i]}
         test_json.append(dict_)
         if (i+1) % 10000 == 0:
             print("test write {:.4f}%".format((i+1)*100.0 / len(all_test_img_path)))
