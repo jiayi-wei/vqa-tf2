@@ -1,0 +1,6 @@
+Model trained with 87 epochs:
+    Eval on train+val, acc 77.2%
+    Eval on test, yes/no 66.43%
+                  number 30.4%
+                  others 37.92%
+                  overall 48.81%

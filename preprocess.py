@@ -196,13 +196,15 @@ def main(params):
 
     # extract image features
     # Train
-    # extract_feature(all_train_img_path,
-    #                True,
-    #                image_features_extract_model,
-    #                params)
+    '''
+    extract_feature(all_train_img_path,
+                    True,
+                    image_features_extract_model,
+                    params)
     print("train image done.")
-
+    '''
     # Test
+
     extract_feature(all_test_img_path,
                     False,
                     image_features_extract_model,
@@ -237,13 +239,13 @@ def main(params):
                                          cate='que',
                                          train_flag=False)
         np.save(ques_feature_path, ques_feature)
-        dict_ = {'img': feature_path(all_train_img_path[i],
+        dict_ = {'img': feature_path(all_test_img_path[i],
                                      cate='img',
                                      train_flag=False),
                  'que': ques_feature_path,
                  'id': all_test_id[i]}
         test_json.append(dict_)
-        if (i+1) % 10000 == 0:
+        if (i+1) % 100000 == 0:
             print("test write {:.4f}%".format((i+1)*100.0 / len(all_test_img_path)))
     json.dump(test_json, open(params['output_test_json'], 'w'))
     print('test write done')

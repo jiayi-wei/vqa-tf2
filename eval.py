@@ -5,6 +5,8 @@ import numpy as np
 import json
 from model_2lstm import *
 import os
+from PIL import Image
+import matplotlib.pyplot as plt
 
 
 #######################
@@ -13,7 +15,9 @@ import os
 print("Loading config")
 test_input_json = "./data/test_data.json"
 train_input_json = "./data/train_data.json"
-with_target = True
+# True test on train+val
+# False test on test
+with_target = False
 
 batch_size = 1024
 embedding_size = 1024
@@ -23,6 +27,8 @@ num_output = 2000 + 1
 vocab_size = 16440 + 1
 
 experimental_name = "san_2lstm_all"
+
+save_batches = 0
 
 #######################
 
@@ -57,6 +63,7 @@ def get_data(json_file,
             ans_test.append(item['ans'])
         else:
             ans_test.append(-1)
+
     num_steps = len(img_name_test) // batch_size
     print("Total test samples {}, batch_size {}, steps needed {}".format(
             len(img_name_test), batch_size, num_steps))
@@ -66,7 +73,7 @@ def get_data(json_file,
                                                   q_id))
     dataset = dataset.map(lambda item1, item2, item3, item4: tf.numpy_function(map_func,
                                                         [item1, item2, item3, item4],
-                                                        [tf.float32, tf.int32, tf.int32, tf.string, tf.string]),
+                                                        [tf.float32, tf.int32, tf.int32, tf.int32, tf.string]),
                                             num_parallel_calls=tf.data.experimental.AUTOTUNE)
     # else:
     #    dataset = dataset.map(lambda item1, item2: tf.numpy_function(map_func_no_target,
@@ -76,6 +83,114 @@ def get_data(json_file,
     dataset = dataset.batch(batch_size).prefetch(
         buffer_size=tf.data.experimental.AUTOTUNE)
     return dataset
+
+
+def plot_att(img, q, a, pred, att1, att2, path):
+    temp_image = np.array(Image.open(img))
+    fig = plt.figure(figsize=(20, 20))
+
+    att1 = np.resize(att1, (7, 7))
+    att2 = np.resize(att2, (7, 7))
+
+    title = "Question: {}\n Pred Ans: {}, True Ans: {}\n Weight from Layer{}"
+    title1 = title.format(q, pred, a, 1)
+    title2 = title.format(q, pred, a, 2)
+
+    ax = fig.add_subplot(1, 2, 1)
+    ax.set_title(title1)
+    img = ax.imshow(temp_image)
+    ax.imshow(att1, cmap='gray', alpha=0.6, extent=img.get_extent())
+    plt.axis('off')
+
+    ax = fig.add_subplot(1, 2, 2)
+    ax.set_title(title2)
+    img = ax.imshow(temp_image)
+    ax.imshow(att2, cmap='gray', alpha=0.6, extent=img.get_extent())
+
+    plt.tight_layout()
+    plt.axis('off')
+    plt.savefig(path)
+    plt.close(fig)
+
+
+def save_result(batch,
+                prediction,
+                layer_1_w,
+                layer_2_w,
+                que_tensor,
+                tokenizer,
+                img_path,
+                img_path_sub,
+                target,
+                with_target,
+                idx_to_ans,
+                res,
+                res_image_path):
+    for i in range(prediction.shape[0]):
+        # save prediction results one by one
+        name = "{:04d}_{:04d}_".format(batch, i)
+        # save attention weights
+        w1 = layer_1_w[i].numpy()
+        # w1_path_here = os.path.join(w1_path, name+"w1.npy")
+        # np.save(w1_path_here, w1)
+        w2 = layer_2_w[i].numpy()
+        # w2_path_here = os.path.join(w2_path, name+"w2.npy")
+        # np.save(w2_path_here, w2)
+        att_img_path = os.path.join(res_image_path, name+".jpg")
+
+        # convert question tensor to question
+        que = que_tensor[i].numpy()
+        clean_que = []
+        for idx in que:
+            if idx != 0:
+                clean_que.append(idx)
+        clean_que = tokenizer.sequences_to_texts([np.array(clean_que)])[0]
+
+        # image path
+        fig_path = str(img_path[i].numpy())
+        if "train2014" in fig_path:
+            cat = "train2014"
+        elif "val2014" in fig_path:
+            cat = "val2014"
+        elif "test2015" in fig_path:
+            cat = "test2015"
+        else:
+            print(fig_path)
+            quit()
+        ext = fig_path.split("/")[-1]
+        ext = ext.split(".")[0]
+        fig_path = img_path_sub.format(cat) + ext + ".jpg"
+
+        # convert ans idx to ans
+        ans = target[i].numpy()
+        if with_target:
+            ans = idx_to_ans[str(ans)]
+        else:
+            ans = "None"
+        pred = prediction[i].numpy()
+        pred = idx_to_ans[str(pred)]
+
+        plot_att(fig_path, clean_que, ans, pred, w1, w2, att_img_path)
+
+        # build results dictionary
+        # dic_ = {"w1": w1_path_here,
+        # "w2": w2_path_here,
+        dic_ = {"que": clean_que,
+                "ans": ans,
+                "pre": pred,
+                "img": fig_path,
+                "img_att": att_img_path}
+        res.append(dic_)
+
+    return res
+
+
+def get_test_dict(prediction, qid, idx_to_ans, res):
+    qid = qid.numpy()
+    for i in range(prediction.shape[0]):
+        res.append({"question_id": int(qid[i]),
+                    "answer": idx_to_ans[str(prediction[i].numpy())]})
+    return res
 
 
 def test():
@@ -107,6 +222,7 @@ def test():
     # params to save eval results
     correct, total = 0, 0
     res = []
+    test_res = []
 
     # restore tokenizer
     with open("./data/tokenizer.txt", 'r') as file:
@@ -119,88 +235,54 @@ def test():
 
     extention = "train" if with_target else "test"
     save_path = os.path.join(checkpoint_path, extention)
-    w1_path = os.path.join(save_path, 'w1')
-    w2_path = os.path.join(save_path, 'w2')
+    res_image_path = os.path.join(save_path, 'res')
     res_path = os.path.join(save_path, 'res.json')
+    test_res_path = os.path.join(save_path, 'test_res.json')
 
     if not os.path.exists(save_path):
         os.mkdir(save_path)
-        os.mkdir(w1_path)
-        os.mkdir(w2_path)
+        os.mkdir(res_image_path)
 
     img_path_sub = "./data/img/{}/"
 
+    print("Evaluation Begin...")
     for (batch, (img_tensor, que_tensor, target, qid, img_path)) in enumerate(dataset):
         prediction, layer_1_w, layer_2_w = model(que_tensor,
                                                  img_tensor)
         prediction = tf.math.argmax(prediction, axis=1)
         prediction = tf.cast(prediction, dtype=tf.int32)
 
-        for i in range(prediction.shape[0]):
-            # save prediction results one by one
+        if with_target:
+            total += prediction.shape[0]
+            correct += tf.math.count_nonzero(tf.math.equal(prediction, target)).numpy()
+        else:
+            test_res = get_test_dict(prediction, qid, idx_to_ans, test_res)
 
-            if with_target:
-                total += 1
-                if prediction[i] == target[i]:
-                    correct += 1
+        if batch < save_batches:
+            res = save_result(batch=batch,
+                              prediction=prediction,
+                              layer_1_w=layer_1_w,
+                              layer_2_w=layer_2_w,
+                              que_tensor=que_tensor,
+                              target=target,
+                              with_target=with_target,
+                              img_path=img_path,
+                              img_path_sub=img_path_sub,
+                              tokenizer=tokenizer,
+                              idx_to_ans=idx_to_ans,
+                              res=res,
+                              res_image_path=res_image_path)
+            print("save one batch")
 
-            name = "{:04d}_{:04d}_".format(batch, i)
-
-            # save attention weights
-            w1 = layer_1_w[i].numpy()
-            w1_path_here = os.path.join(w1_path, name+"w1.npy")
-            np.save(w1_path_here, w1)
-            w2 = layer_2_w[i].numpy()
-            w2_path_here = os.path.join(w2_path, name+"w2.npy")
-            np.save(w2_path_here, w2)
-
-            # convert question tensor to question
-            que = que_tensor[i].numpy()
-            clean_que = []
-            for idx in que:
-                if idx != 0:
-                    clean_que.append(idx)
-            clean_que = tokenizer.sequences_to_texts([np.array(clean_que)])[0]
-
-            # image path
-            fig_path = str(img_path[i].numpy())
-            if "train2014" in fig_path:
-                cat = "train2014"
-            elif "val2014" in fig_path:
-                cat = "val2014"
-            elif "test2015" in fig_path:
-                cat = "val2015"
-            else:
-                print(fig_path)
-                quit()
-            ext = fig_path.split("/")[-1]
-            ext = ext.split(".")[0]
-            fig_path = img_path_sub.format(cat) + ext + ".jpg"
-
-            # convert ans idx to ans
-            ans = target[i].numpy()
-            if with_target:
-                ans = idx_to_ans[str(ans)]
-            else:
-                ans = "None"
-            pred = prediction[i].numpy()
-            pred = idx_to_ans[str(pred)]
-
-            # build results dictionary
-            dic_ = {"w1": w1_path_here,
-                    "w2": w2_path_here,
-                    "que": clean_que,
-                    "ans": ans,
-                    "pre": pred,
-                    "img": fig_path}
-            res.append(dic_)
-
-    print("Batch: ", batch)
-
+        if(batch % 100 == 0):
+            print("Batch: ", batch)
     # save results
     if with_target:
-        print("Accu {}".format(correct / total))
+        print("Total {}, Cor {}, Accu {}".format(total, correct, correct / total))
+    else:
+        json.dump(test_res, open(test_res_path, 'w'))
     json.dump(res, open(res_path, 'w'))
+    print("Evaluation Done.")
 
 
 if __name__ == "__main__":
